@@ -14,24 +14,48 @@ def calc_delta(a, b):
     return math.sqrt(sum([abs(a[i] - b[i]) for i in range(len(a))]))
 
 
-def remove_output_and_clear(output_file, ref_reader, output_reader):
+def remove_output_and_clear(output_directory, new_files, ref_reader, output_reader):
     ref_reader.file.close()
     output_reader.file.close()
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    for file in new_files:
+        output_file = output_directory + "\\" + file
+        if os.path.exists(output_file):
+            os.remove(output_file)
+
+
+def get_file_names_from_directory(directory):
+    return os.listdir(directory)
+
+
+def get_new_files(pre_files, post_files):
+    to_return = []
+    for name in post_files:
+        if name not in pre_files:
+            to_return.append(name)
+    return to_return
 
 
 def make_one_test(log_file, file_path, test_index):
     print("Start test " + str(test_index) + ": " + file_path)
+    file_folder = "\\".join(file_path.split("\\")[:-1])
+    # get files in the directory before the render
+    pre_render_files = get_file_names_from_directory(current_directory + "\\" + file_folder)
+
     start_time = time.time()
     subprocess.run([softimage_root + "\\Application\\bin\\XSIBATCH.bat",
                     "-render",
                     current_directory + "\\" + file_path],
                    stdout=log_file, stderr=log_file)
-    file_folder = "\\".join(file_path.split("\\")[:-1])
-    output_file = current_directory + "\\" + file_folder + "\\" + "output.1.png"
-    ref_file = current_directory + "\\" + file_folder + "\\" + "ref.png"
-    if os.path.exists(output_file):
+    # next all files after the render
+    post_render_files = get_file_names_from_directory(current_directory + "\\" + file_folder)
+    new_files = get_new_files(pre_render_files, post_render_files)
+
+    if len(new_files) > 0:
+        # use as output fle the first new file
+        output_directory = current_directory + "\\" + file_folder
+        output_file = output_directory + "\\" + new_files[0]
+        ref_file = output_directory + "\\" + "ref.png"
+
         if os.path.exists(ref_file):
             ref_reader = png.Reader(filename=ref_file)
             ref_width, ref_height, ref_raw_pixels, ref_metadata = ref_reader.asRGBA8()
@@ -40,7 +64,7 @@ def make_one_test(log_file, file_path, test_index):
             output_width, output_height, output_raw_pixels, output_metadata = output_reader.asRGBA8()
 
             if ref_width != output_width or ref_height != output_height:
-                remove_output_and_clear(output_file, ref_reader, output_reader)
+                remove_output_and_clear(output_directory, new_files, ref_reader, output_reader)
                 raise Exception(f"Different dismensions. Reference is {ref_width}x{ref_height}, but output is {output_width}x{output_height}")
             else:
                 ref_pixels = [[int(v) for v in row] for row in ref_raw_pixels]
@@ -53,16 +77,16 @@ def make_one_test(log_file, file_path, test_index):
                         out_pixel = tuple(output_pixels[row_index][4 * column_index:4 * (column_index + 1)])
                         delta_sum += calc_delta(ref_pixel, out_pixel)
                 if delta_sum > 1.0:
-                    remove_output_and_clear(output_file, ref_reader, output_reader)
+                    remove_output_and_clear(output_directory, new_files, ref_reader, output_reader)
                     raise Exception("Too big difference between reference and output image: " + str(delta_sum) + ".")
-                remove_output_and_clear(output_file, ref_reader, output_reader)
+                remove_output_and_clear(output_directory, new_files, ref_reader, output_reader)
 
                 end_time = time.time()
                 print("\tSuccessfuly done. Time: " + str(end_time - start_time) + " sec.")
         else:
             raise Exception("Reference file doest not exist.")
     else:
-        raise Exception("Output file doest not created.")
+        raise Exception("There are no new files after the render.")
 
 
 def make_tests(scenes_directory, render_log_filename, only_tests=None):
