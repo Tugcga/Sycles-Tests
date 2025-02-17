@@ -1,6 +1,5 @@
 import os
 import subprocess
-import math
 import time
 
 import py_modules.png as png
@@ -10,8 +9,25 @@ softimage_root = "C:\\Program Files\\Autodesk\\Softimage 2015"
 current_directory = "\\".join(os.path.abspath(__file__).split("\\")[:-1])
 
 
-def calc_delta(a, b):
-    return math.sqrt(sum([abs(a[i] - b[i]) for i in range(len(a))]))
+def calc_images_delta(pixels_a, pixels_b):
+    '''pixels_a and pixels_b are in the format [[row_0, ...], [row_1, ...], ...]
+    each row is a plain array of colors r, g, b, a, ...
+    we assume that sizeas of the images are the same (it checked before the function called)
+    '''
+    s = 0
+    pixels_count = 0
+    for row_index in range(len(pixels_a)):
+        row_a = pixels_a[row_index]
+        row_b = pixels_b[row_index]
+        length = len(row_a) // 4
+        pixels_count += length
+        for pixel_index in range(length):
+            a = row_a[4 * pixel_index: 4 * (pixel_index + 1)]
+            b = row_b[4 * pixel_index: 4 * (pixel_index + 1)]
+            for channel in range(4):
+                s += (a[channel] - b[channel])**2
+    s = s / (4 * pixels_count * 255**2)
+    return s
 
 
 def remove_output_and_clear(output_directory, new_files, ref_reader, output_reader):
@@ -70,15 +86,10 @@ def make_one_test(log_file, file_path, test_index):
                 ref_pixels = [[int(v) for v in row] for row in ref_raw_pixels]
                 output_pixels = [[int(v) for v in row] for row in output_raw_pixels]
 
-                delta_sum = 0.0
-                for row_index in range(ref_height):
-                    for column_index in range(ref_width):
-                        ref_pixel = tuple(ref_pixels[row_index][4 * column_index:4 * (column_index + 1)])
-                        out_pixel = tuple(output_pixels[row_index][4 * column_index:4 * (column_index + 1)])
-                        delta_sum += calc_delta(ref_pixel, out_pixel)
-                if delta_sum > 1.0:
+                delta = calc_images_delta(ref_pixels, output_pixels)
+                if delta > 0.01:
                     remove_output_and_clear(output_directory, new_files, ref_reader, output_reader)
-                    raise Exception("Too big difference between reference and output image: " + str(delta_sum) + ".")
+                    raise Exception("Too big difference between reference and output image: " + str(delta) + ".")
                 remove_output_and_clear(output_directory, new_files, ref_reader, output_reader)
 
                 end_time = time.time()
