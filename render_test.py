@@ -93,7 +93,7 @@ def make_one_test(log_file, file_path, test_index):
                 remove_output_and_clear(output_directory, new_files, ref_reader, output_reader)
 
                 end_time = time.time()
-                print("\tSuccessfuly done. Time: " + str(end_time - start_time) + " sec.")
+                print("\tSuccessfuly done. Time: " + str(end_time - start_time) + " sec. Image delta: " + str(delta))
         else:
             raise Exception("Reference file doest not exist.")
     else:
