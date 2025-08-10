@@ -1,0 +1,1 @@
+before run the test copy the file VoronoiNormal.osl into directory /Application/osl/ inside any workgroup
